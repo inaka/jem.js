@@ -1,4 +1,5 @@
-# jem.js
+![Jem!](http://i.imgur.com/6apYjTN.gif)
+
 Just Erlang Maps for Javascript
 
 Jem.js encodes JavaScript objects in native erlang notation, so that, from Erlang you can simply call ``erlang:binary_to_term(Binary)`` to obtain the same representation of a JSON you would usually get from jiffy.
