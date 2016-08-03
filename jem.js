@@ -111,7 +111,12 @@ if (typeof Inaka.Jem == 'undefined') Inaka.Jem = {};
    // NOTE: THIS WILL NOT WORK WITH FLOATS
    function _encodeNumber(num, a)
    {
-     if (num < 255)
+     if (num < 0)
+     {
+       _writeByte(98, a);
+       _writeInt((~(-num)) + 1, a);
+     }
+     else if (num < 255)
      {
        _writeByte(97, a);
        _writeByte(num, a);
@@ -219,6 +224,13 @@ if (typeof Inaka.Jem == 'undefined') Inaka.Jem = {};
 
    function _readInt(a, i)
    {
-     return [(a[i++] << 24) + (a[i++] << 16) + (a[i++] << 8) + a[i++], i];
+     if (a[i] & 128)
+     {
+       return [-(~((a[i++] << 24) + (a[i++] << 16) + (a[i++] << 8) + a[i++] - 1)), i];
+     }
+     else
+     {
+       return [(a[i++] << 24) + (a[i++] << 16) + (a[i++] << 8) + a[i++], i];
+     }
    }
  }).call(Inaka.Jem)
