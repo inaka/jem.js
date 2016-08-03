@@ -1,0 +1,26 @@
+{
+  "name": "jem.js",
+  "version": "1.0.0",
+  "description": "JavaScript Erlang's External Term Format encoder/decoder",
+  "main": "jem.js",
+  "directories": {
+    "example": "examples"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/inaka/jem.js.git"
+  },
+  "keywords": [
+    "erlang",
+    "json"
+  ],
+  "author": "Hernan Rivas Acosta",
+  "license": "Apache-2.0",
+  "bugs": {
+    "url": "https://github.com/inaka/jem.js/issues"
+  },
+  "homepage": "https://github.com/inaka/jem.js#readme"
+}
