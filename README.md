@@ -12,7 +12,7 @@ So why would you use this? You can save money on the hosting.
 
 ## How to use it?
 
-The 2 functions Jem.js exposes are pretty straight forward and you can find usage examples in the examples directory (or even better, just try using [this Fiddle](https://jsfiddle.net/kefvsuyo/)).
+The 2 functions Jem.js exposes are pretty straight forward and you can find usage examples in the examples directory (or even better, just try using [this Fiddle](https://jsfiddle.net/HernanR/51mxsfr0/1/)).
 
 From the erlang side it's just as simple, all you need to do is replace ``jiffy:decode/1`` and ``jiffy:encode/1`` with ``binary_to_term/1`` and ``term_to_binary/1``.
 

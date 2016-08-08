@@ -6,70 +6,84 @@ if (typeof Inaka.Jem == 'undefined') Inaka.Jem = {};
 (function()
  {
    // API
-   this.encode = function(obj)
+   this.encode = function(obj, mtu = 1500)
                  {
-                   var r = [131];
-                   _encodeValue(obj, r);
-                   return r;
+                   var dv = new DataView(new ArrayBuffer(mtu));
+                   dv.setUint8(0, 131);
+                   var [dv, i] = _encodeValue(obj, dv, 1);
+                   return dv.buffer.slice(0, i);
                  };
-   this.decode = function(bin)
+   this.decode = function(buffer)
                  {
-                   return bin[0] != 131 ? "badarg" : _decodeValue(bin, 1)[0];
+                   var dv = new DataView(buffer);
+                   if (dv.getUint8(0) != 131)
+                     throw "badarg";
+                   else
+                     return _decodeValue(dv, 1)[0];
                  };
 
    // Internal functions
-   function _encodeValue(value, a)
+   function _encodeValue(value, dv, i)
    {
      if(value === null)
      {
-       _encodeNull(a);
+       return _encodeNull(dv, i);
      }
      else
      {
        switch(value.constructor.name)
        {
-         case "Object":  _encodeObject(value, a);  break;
-         case "Number":  _encodeNumber(value, a);  break;
-         case "Array":   _encodeArray(value, a);   break;
-         case "String":  _encodeString(value, a);  break;
-         case "Boolean": _encodeBoolean(value, a); break;
+         case "Object":  return _encodeObject(value, dv, i);
+         case "Number":  return _encodeNumber(value, dv, i);
+         case "Array":   return _encodeArray(value, dv, i);
+         case "String":  return _encodeString(value, dv, i);
+         case "Boolean": return _encodeBoolean(value, dv, i);
        }
      }
    }
 
-   function _decodeValue(a, i)
+   function _decodeValue(dv, i)
    {
-     switch(a[i])
+     switch(dv.getUint8(i))
      {
-       case 100:
-         return _decodeAtom(a, i + 1);
-       case 116:
-         return _decodeObject(a, i + 1);
+       case 70:
+         return [dv.getFloat64(i + 1), i + 9];
        case 97:
-         return _readByte(a, i + 1);
+         return [dv.getUint8(i + 1), i + 2];
        case 98:
-         return _readInt(a, i + 1);
+         return [dv.getInt32(i + 1), i + 5];
+       case 100:
+         return _decodeAtom(dv, i + 1);
+       case 106:
+         return [[], i + 2];
        case 108:
-         return _decodeArray(a, i + 1);
+         return _decodeArray(dv, i + 1);
        case 109:
-         return _decodeString(a, i + 1);
+         return _decodeString(dv, i + 1);
+       case 116:
+         return _decodeObject(dv, i + 1);
+       default:
+         throw "bad_tag: " + dv.getUint8(i);
      }
    }
 
-   function _encodeNull(a)
+   function _encodeNull(dv, i)
    {
-     _writeByte(100, a);
-     _writeShort(4, a);
-     _writeInt(1853189228, a);
+     dv = _getDataView(dv, i, 7);
+     dv.setUint8(i, 100);
+     dv.setUint16(i + 1, 4);
+     dv.setUint32(i + 3, 1853189228);
+     return [dv, i + 7];
    }
 
-   function _decodeAtom(a, i)
+   function _decodeAtom(dv, i)
    {
-     var [l, i] = _readShort(a, i);
+     var l = dv.getUint16(i);
+     i += 2;
      var str = "";
      for(var k = 0; k < l; k++)
      {
-       str += String.fromCharCode(a[i + k]);
+       str += String.fromCharCode(dv.getUint8(i + k));
      }
      var value;
      switch (str)
@@ -77,160 +91,165 @@ if (typeof Inaka.Jem == 'undefined') Inaka.Jem = {};
        case "null":  value = null;  break;
        case "true":  value = true;  break;
        case "false": value = false; break;
+       default: throw "badarg";
      }
      return [value, i + k];
    }
 
-   function _encodeObject(obj, a)
+   function _encodeObject(obj, dv, i)
    {
-     _writeByte(116, a);
+     dv = _getDataView(dv, i, 5);
+     dv.setUint8(i, 116);
+     i += 1;
      var keys = Object.keys(obj);
      var l = keys.length
-     _writeInt(l, a);
-     for(var i = 0; i < l; i++)
+     dv.setUint32(i, l);
+     i += 4;
+     for(var k = 0; k < l; k++)
      {
-       var k = keys[i];
-       _encodeString(k, a);
-       _encodeValue(obj[k], a);
+       var key = keys[k];
+       var [dv, i] = _encodeString(key, dv, i);
+       var [dv, i] = _encodeValue(obj[key], dv, i);
      }
+     return [dv, i];
    }
 
-   function _decodeObject(a, i)
+   function _decodeObject(dv, i)
    {
-     var [l, i] = _readInt(a, i);
+     var l = dv.getUint32(i);
+     i += 4;
      var obj = {};
      for(var k = 0; k < l; k++)
      {
-       var [key, i] = _decodeString(a, i + 1);
-       var [value, i] = _decodeValue(a, i);
+       var [key, i] = _decodeString(dv, i + 1);
+       var [value, i] = _decodeValue(dv, i);
        obj[key] = value;
      }
      return [obj, i];
    }
 
-   // NOTE: THIS WILL NOT WORK WITH FLOATS
-   function _encodeNumber(num, a)
+   function _encodeNumber(num, dv, i)
    {
-     if (num < 0)
+     // Check if we have a float or not
+     if (num != Math.floor(num))
      {
-       _writeByte(98, a);
-       _writeInt((~(-num)) + 1, a);
-     }
-     else if (num < 255)
-     {
-       _writeByte(97, a);
-       _writeByte(num, a);
+       dv = _getDataView(dv, i, 9);
+       dv.setUint8(i, 70);
+       dv.setFloat64(i + 1, num);
+       return [dv, i + 9];
      }
      else
      {
-       _writeByte(98, a);
-       _writeInt(num, a);
+       if (num >= 0 && num < 255)
+       {
+         dv = _getDataView(dv, i, 2);
+         dv.setUint8(i, 97);
+         dv.setUint8(i + 1, num);
+         return [dv, i + 2];
+       }
+       else
+       {
+         dv = _getDataView(dv, i, 5);
+         dv.setUint8(i, 98);
+         dv.setInt32(i + 1, num);
+         return [dv, i + 5];
+       }
      }
    }
 
-   function _encodeArray(arr, a)
+   function _encodeArray(arr, dv, i)
    {
-     _writeByte(108, a);
+     dv = _getDataView(dv, i, 5);
+     dv.setUint8(i, 108);
+     i += 1;
      var l = arr.length;
-     _writeInt(l, a);
-     for(var i = 0; i < l; i++)
+     dv.setUint32(i, l);
+     i += 4;
+     for(var k = 0; k < l; k++)
      {
-       _encodeValue(arr[i], a);
+       var [dv, i] = _encodeValue(arr[k], dv, i);
      }
-     _writeByte(106, a);
+     dv = _getDataView(dv, i, 1);
+     dv.setUint8(i, 106);
+     return [dv, i + 1];
    }
 
-   function _decodeArray(a, i)
+   function _decodeArray(dv, i)
    {
-     var [l, i] = _readInt(a, i);
+     var l = dv.getUint32(i);
+     i += 4;
      var arr = [];
      for(var k = 0; k < l; k++)
      {
-       var [value, i] = _decodeValue(a, i);
+       var [value, i] = _decodeValue(dv, i);
        arr[k] = value;
      }
      return [arr, i + 1];
    }
 
-   function _encodeString(str, a)
+   function _encodeString(str, dv, i)
    {
-     _writeByte(109, a);
      var l = str.length;
-     _writeInt(l, a);
-     for(var i = 0; i < l; i++)
+     dv = _getDataView(dv, i, l + 5);
+     dv.setUint8(i, 109);
+     i += 1;
+     dv.setUint32(i, l);
+     i += 4;
+     for(var k = 0; k < l; k++)
      {
-       _writeByte(str.charCodeAt(i), a);
+       dv.setUint8(i + k, str.charCodeAt(k));
      }
+     return [dv, i + k];
    }
 
-   function _decodeString(a, i)
+   function _decodeString(dv, i)
    {
-     var [l, i] = _readInt(a, i);
+     var l = dv.getUint32(i);
+     i += 4;
      var str = "";
      for(var k = 0; k < l; k++)
      {
-       str += String.fromCharCode(a[i + k]);
+       str += String.fromCharCode(dv.getUint8(i + k));
      }
      return [str, i + k];
    }
 
-   function _encodeBoolean(bool, a)
+   function _encodeBoolean(bool, dv, i)
    {
-     _writeByte(100, a);
+     dv = _getDataView(dv, i, 8);
+     dv.setUint8(i, 100);
      if (bool)
      {
-       _writeShort(4, a);
-       _writeInt(1953658213, a);
+       dv.setUint16(i + 1, 4);
+       dv.setUint32(i + 3, 1953658213);
+       return [dv, i + 7];
      }
      else
      {
-       _writeShort(5, a);
-       _writeByte(102, a);
-       _writeInt(1634497381, a);
+       dv.setUint16(i + 1, 5);
+       dv.setUint8(i + 3, 102);
+       dv.setUint32(i + 4, 1634497381);
+       return [dv, i + 8];
      }
    }
 
    // Utils
-   function _writeByte(byte, a)
+   function _getDataView(dv, i, l)
    {
-     a[a.length] = byte;
-   }
-
-   function _readByte(a, i)
-   {
-     return [a[i++], i];
-   }
-
-   function _writeShort(short, a)
-   {
-     var l = a.length;
-     a[l + 0] = (short >> 8) & 255;
-     a[l + 1] = short & 255;
-   }
-
-   function _readShort(a, i)
-   {
-     return [(a[i++] << 8) + a[i++], i];
-   }
-
-   function _writeInt(int, a)
-   {
-     var l = a.length;
-     a[l + 0] = (int >> 24) & 255;
-     a[l + 1] = (int >> 16) & 255;
-     a[l + 2] = (int >> 8) & 255;
-     a[l + 3] = int & 255;
-   }
-
-   function _readInt(a, i)
-   {
-     if (a[i] & 128)
+     if (dv.byteLength < i + l)
      {
-       return [-(~((a[i++] << 24) + (a[i++] << 16) + (a[i++] << 8) + a[i++] - 1)), i];
+       return new DataView(_expandBuffer(dv.buffer, i + l));
      }
      else
      {
-       return [(a[i++] << 24) + (a[i++] << 16) + (a[i++] << 8) + a[i++], i];
+       return dv;
      }
    }
- }).call(Inaka.Jem)
+
+   function _expandBuffer(buffer, minLength)
+   {
+     var tempArr = new Uint8Array(Math.max(minLength, buffer.length * 2));
+     tempArr.set(buffer, 0);
+     return tempArr.buffer;
+   }
+ }).call(Inaka.Jem);
