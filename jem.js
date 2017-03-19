@@ -209,12 +209,12 @@ if (typeof Inaka.Jem == 'undefined') Inaka.Jem = {};
      var l;
      if(lenBytes == 2)
      {
-       var l = dv.getUint16(i);
+       l = dv.getUint16(i);
        i += 2;
      }
      else
      {
-       var l = dv.getUint32(i);
+       l = dv.getUint32(i);
        i += 4;
      }
 
