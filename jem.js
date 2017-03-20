@@ -56,6 +56,8 @@ if (typeof Inaka.Jem == 'undefined') Inaka.Jem = {};
          return _decodeAtom(dv, i + 1);
        case 106:
          return [[], i + 2];
+       case 107:
+         return _decodeString(dv, i + 1, 2);
        case 108:
          return _decodeArray(dv, i + 1);
        case 109:
@@ -91,7 +93,7 @@ if (typeof Inaka.Jem == 'undefined') Inaka.Jem = {};
        case "null":  value = null;  break;
        case "true":  value = true;  break;
        case "false": value = false; break;
-       default: throw "badarg";
+       default: value = str; break;
      }
      return [value, i + k];
    }
@@ -202,10 +204,20 @@ if (typeof Inaka.Jem == 'undefined') Inaka.Jem = {};
      return [dv, i + k];
    }
 
-   function _decodeString(dv, i)
+   function _decodeString(dv, i, lenBytes = 4)
    {
-     var l = dv.getUint32(i);
-     i += 4;
+     var l;
+     if(lenBytes == 2)
+     {
+       l = dv.getUint16(i);
+       i += 2;
+     }
+     else
+     {
+       l = dv.getUint32(i);
+       i += 4;
+     }
+
      var str = "";
      for(var k = 0; k < l; k++)
      {
