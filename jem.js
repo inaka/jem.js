@@ -123,7 +123,7 @@ if (typeof Inaka.Jem == 'undefined') Inaka.Jem = {};
      var obj = {};
      for(var k = 0; k < l; k++)
      {
-       var [key, i] = _decodeString(dv, i + 1);
+       var [key, i] = _decodeValue(dv, i);
        var [value, i] = _decodeValue(dv, i);
        obj[key] = value;
      }
