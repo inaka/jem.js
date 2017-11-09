@@ -39,9 +39,6 @@ handle_post(Req, State) ->
 (just remember you are not accepting ``application/json`` but ``application/erlang`` on the content types)
 
 ## Contact Us
-For **questions** or **general comments** regarding the use of this library,
-please use our public [hipchat room](http://inaka.net/hipchat).
-
 If you find any **bugs** or have a **problem** while using this library, please
 [open an issue](https://github.com/inaka/jem.js/issues/new) in this repo
 (or a pull request :)).
